@@ -1,1 +1,2 @@
-# car rental project using java oops
+# DriveEasy Rentals
+
