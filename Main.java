@@ -1,21 +1,28 @@
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.io.FileWriter;
+import java.io.IOException;
 
 class Car {
     private String carId;
     private String brand;
     private String model;
     private double basePricePerDay;
+    private String carType; // New attribute: Car Type (SUV, Sedan, etc.)
+    private String fuelType; // New attribute: Fuel type (Petrol, Diesel, Electric)
     private boolean isAvailable;
 
-    public Car(String carId, String brand, String model, double basePricePerDay) {
+    public Car(String carId, String brand, String model, double basePricePerDay, String carType, String fuelType) {
         this.carId = carId;
         this.brand = brand;
         this.model = model;
         this.basePricePerDay = basePricePerDay;
+        this.carType = carType;
+        this.fuelType = fuelType;
         this.isAvailable = true;
     }
+
     public String getCarId() {
         return carId;
     }
@@ -28,8 +35,28 @@ class Car {
         return model;
     }
 
-    public double calculatePrice(int rentalDays) {
-        return basePricePerDay * rentalDays;
+    public String getCarType() {
+        return carType;
+    }
+
+    public String getFuelType() {
+        return fuelType;
+    }
+
+    public double calculatePrice(int rentalDays, boolean isWeekend) {
+        double totalPrice = basePricePerDay * rentalDays;
+
+        // Apply weekend surcharge (10% extra on weekends)
+        if (isWeekend) {
+            totalPrice *= 1.10;
+        }
+
+        // Apply long-term rental discount (10% discount for rentals over 7 days)
+        if (rentalDays > 7) {
+            totalPrice *= 0.90;
+        }
+
+        return totalPrice;
     }
 
     public boolean isAvailable() {
@@ -67,11 +94,13 @@ class Rental {
     private Car car;
     private Customer customer;
     private int days;
+    private boolean isWeekend;
 
-    public Rental(Car car, Customer customer, int days) {
+    public Rental(Car car, Customer customer, int days, boolean isWeekend) {
         this.car = car;
         this.customer = customer;
         this.days = days;
+        this.isWeekend = isWeekend;
     }
 
     public Car getCar() {
@@ -84,6 +113,10 @@ class Rental {
 
     public int getDays() {
         return days;
+    }
+
+    public boolean isWeekend() {
+        return isWeekend;
     }
 }
 
@@ -106,11 +139,11 @@ class CarRentalSystem {
         customers.add(customer);
     }
 
-    public void rentCar(Car car, Customer customer, int days) {
+    public void rentCar(Car car, Customer customer, int days, boolean isWeekend) {
         if (car.isAvailable()) {
             car.rent();
-            rentals.add(new Rental(car, customer, days));
-
+            rentals.add(new Rental(car, customer, days, isWeekend));
+            saveRentalRecord(car, customer, days);
         } else {
             System.out.println("Car is not available for rent.");
         }
@@ -127,9 +160,19 @@ class CarRentalSystem {
         }
         if (rentalToRemove != null) {
             rentals.remove(rentalToRemove);
-
         } else {
             System.out.println("Car was not rented.");
+        }
+    }
+
+    public void saveRentalRecord(Car car, Customer customer, int days) {
+        try (FileWriter writer = new FileWriter("rental_records.txt", true)) {
+            writer.write("Customer ID: " + customer.getCustomerId() + ", ");
+            writer.write("Customer Name: " + customer.getName() + ", ");
+            writer.write("Car: " + car.getBrand() + " " + car.getModel() + " (" + car.getCarType() + ", " + car.getFuelType() + "), ");
+            writer.write("Rental Days: " + days + "\n");
+        } catch (IOException e) {
+            System.out.println("Error saving rental record: " + e.getMessage());
         }
     }
 
@@ -154,7 +197,8 @@ class CarRentalSystem {
                 System.out.println("\nAvailable Cars:");
                 for (Car car : cars) {
                     if (car.isAvailable()) {
-                        System.out.println(car.getCarId() + " - " + car.getBrand() + " " + car.getModel());
+                        System.out.println(car.getCarId() + " - " + car.getBrand() + " " + car.getModel() +
+                                " (" + car.getCarType() + ", " + car.getFuelType() + ")");
                     }
                 }
 
@@ -164,6 +208,10 @@ class CarRentalSystem {
                 System.out.print("Enter the number of days for rental: ");
                 int rentalDays = scanner.nextInt();
                 scanner.nextLine(); // Consume newline
+
+                System.out.print("Is it a weekend rental? (Y/N): ");
+                String isWeekendStr = scanner.nextLine();
+                boolean isWeekend = isWeekendStr.equalsIgnoreCase("Y");
 
                 Customer newCustomer = new Customer("CUS" + (customers.size() + 1), customerName);
                 addCustomer(newCustomer);
@@ -177,11 +225,12 @@ class CarRentalSystem {
                 }
 
                 if (selectedCar != null) {
-                    double totalPrice = selectedCar.calculatePrice(rentalDays);
+                    double totalPrice = selectedCar.calculatePrice(rentalDays, isWeekend);
                     System.out.println("\n== Rental Information ==\n");
                     System.out.println("Customer ID: " + newCustomer.getCustomerId());
                     System.out.println("Customer Name: " + newCustomer.getName());
-                    System.out.println("Car: " + selectedCar.getBrand() + " " + selectedCar.getModel());
+                    System.out.println("Car: " + selectedCar.getBrand() + " " + selectedCar.getModel() +
+                            " (" + selectedCar.getCarType() + ", " + selectedCar.getFuelType() + ")");
                     System.out.println("Rental Days: " + rentalDays);
                     System.out.printf("Total Price: $%.2f%n", totalPrice);
 
@@ -189,7 +238,7 @@ class CarRentalSystem {
                     String confirm = scanner.nextLine();
 
                     if (confirm.equalsIgnoreCase("Y")) {
-                        rentCar(selectedCar, newCustomer, rentalDays);
+                        rentCar(selectedCar, newCustomer, rentalDays, isWeekend);
                         System.out.println("\nCar rented successfully.");
                     } else {
                         System.out.println("\nRental canceled.");
@@ -239,13 +288,16 @@ class CarRentalSystem {
     }
 
 }
-public class Main{
+
+ public class Main {
     public static void main(String[] args) {
         CarRentalSystem rentalSystem = new CarRentalSystem();
 
-        Car car1 = new Car("C001", "Toyota", "Camry", 60.0); // Different base price per day for each car
-        Car car2 = new Car("C002", "Honda", "Accord", 70.0);
-        Car car3 = new Car("C003", "Mahindra", "Thar", 150.0);
+        // Adding cars with different types and fuel types
+        Car car1 = new Car("C001", "Toyota", "Camry", 60.0, "Sedan", "Petrol");
+        Car car2 = new Car("C002", "Honda", "Accord", 70.0, "Sedan", "Diesel");
+        Car car3 = new Car("C003", "Mahindra", "Thar", 150.0, "SUV", "Diesel");
+
         rentalSystem.addCar(car1);
         rentalSystem.addCar(car2);
         rentalSystem.addCar(car3);
@@ -253,3 +305,12 @@ public class Main{
         rentalSystem.menu();
     }
 }
+
+
+
+
+
+
+
+
+
